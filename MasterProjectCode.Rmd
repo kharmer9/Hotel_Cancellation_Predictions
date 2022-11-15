@@ -1,0 +1,494 @@
+---
+title: "IST687 Project Master Code"
+author: "Megha Banerjee, Kevin Harmer"
+date: "12/9/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+1. Collective Libraries Used for Analysis
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(stats)
+library(car)
+library(caret)
+library(kernlab)
+library(e1071)
+library(rworldmap)
+library(arules)
+library(arulesViz)
+library(performance)
+library(DHARMa)
+library(stats)
+library(dplyr)
+library(purrr)
+library(tidyr)
+```
+
+2. Importing Data
+```{r}
+hotels <- read_csv('https://intro-datascience.s3.us-east-2.amazonaws.com/Resort01.csv') #importing the data
+```
+
+3. Checking for Any NA values and Cleaning
+```{r}
+#View(hotels) #viewing data set in other window
+str(hotels) #view data set structure
+head(hotels) #view the first 5 inputs
+for (i in c(1:20)) {
+  print(sum(hotels[,i] == 'NULL')) #checking for NULL inputs; also checked for NA values but there were not any
+} #amount of null values in data set
+hotels <- hotels[!hotels$Country == 'NULL',] #removing inputs without a country input
+```
+
+```{r}
+cancel <- hotels[hotels$IsCanceled==1,] #creating a new data set with only canceled observations
+nrow(cancel) #looking at amount of data observations
+
+stay <- hotels[hotels$IsCanceled==0,] #creating a new data set with only non-canceled observations
+nrow(stay) #looking at amount of dat observations
+```
+
+4. Looking at Some Bar Plots
+```{r}
+# COLUMN NOT REQUIRED for analysis of cancellation, no distinct measure shows up 
+plotyplot <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$StaysInWeekendNights)
+plotyplot
+# COLUMN NOT REQUIRED for analysis of cancellation, no distinct measure shows up 
+plotyplot_2 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$LeadTime)
+plotyplot_2
+# COLUMN NOT REQUIRED for analysis of cancellation, no distinct measure shows up 
+plotyplot_3 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$StaysInWeekNights)
+plotyplot_3
+# bookings with 2 adults often tend to get cancelled more frequently , around 75 percent of the times in respect to bookings made where there were 1 or 3 adults
+plotyplot_4 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$Adults)
+plotyplot_4
+# Guests who have children hardly cancel but there cancel rate is higher than with babies
+plotyplot_5 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$Children)
+plotyplot_5
+# Guests who have babies hardly cancel.
+plotyplot_6 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$Babies)
+plotyplot_6
+# only 1 percent of the repeated guests cancel on the hotels. 
+plotyplot_7 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$IsRepeatedGuest)
+plotyplot_7
+# People with Meal SC and FB hardly cancel whereas people taking BB meals cancel 80 percent of the times
+plotyplot_8 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$Meal)
+plotyplot_8
+# COLUMN NOT REQUIRED for analysis
+
+# there is only one country from where bookings are cancelled the most. While we can also infer that most of the bookings are made from this country. Thus this is not an effective measure to find out the probability of cancellation. 
+plotyplot_9 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x=cancel$Country)
+plotyplot_9
+# the market segment which comprises of online TA is responsible for most of the cancellations. Bookings made through groups are second is this respect
+plotyplot_10 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$MarketSegment)
+plotyplot_10
+# COLUMN NOT REQUIRED for analysis
+
+# We cannot use this as a measure to identify potential risk of someone cancelling their booking. Since 99 percent of people had never cancelled their bookings in the hotels before
+plotyplot_11 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$PreviousCancellations)
+plotyplot_11
+# COLUMN NOT REQUIRED for analysis
+
+# We cannot use this as a measure to identify potential risk of someone cancelling their booking. Since 99 percent of people had never cancelled their bookings in the hotels before
+plotyplot_12 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$PreviousBookingsNotCanceled)
+plotyplot_12
+# people assigned with room type A has seen most of the cancellations. To avoid cancellations , people who are identified as high risk cancel probability should be assigned room type B if possible and not A
+plotyplot_13 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$ReservedRoomType)
+plotyplot_13
+# people assigned with room type A has seen most of the cancellations. To avoid cancellations , people who are identified as high risk cancel probability should be assigned room type B if possible and not A
+plotyplot_14 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$AssignedRoomType)
+plotyplot_14
+# most people directly cancel there plans. But some have to change their bookings to accomodate their plan to stay in the hotels. If that is not possible then they cancel their bookings
+plotyplot_15 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$BookingChanges)
+plotyplot_15
+# when booking made with no deposit
+plotyplot_16 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$DepositType)
+plotyplot_16
+# transient customers are the types who are cancelling the booking the most
+plotyplot_17 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$CustomerType)
+plotyplot_17
+# people who cancelled their bookings do not ask for a parking space in advance.
+plotyplot_18 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$RequiredCarParkingSpaces)
+plotyplot_18
+# people with 0 special requests tend to cancel their bookings. We should be sure the booking won't be cancelled if the number of special requests is more than 4
+plotyplot_19 <-  ggplot(cancel) + geom_bar(data=cancel)+ aes(x= cancel$TotalOfSpecialRequests)
+plotyplot_19
+```
+
+Actionable Insights:
+1) While selecting Room type either reserved or assigned room type , avoid giving room type A to people show  patterns of high cancellations risk.
+2) Try incorporating a structure where deposit amount is compulsory because most of the people cancelled had no deposit
+3) When people make an effort to change their bookings greet them with more importance because it shows inclination towards coming to stay in the hotels. Which means there is less chance of cancellation
+4) Make an effort to get special requests from the customers, to be very safe , at least 4 or more. Customers making special requests hardly cancel their bookings
+5) Always ask for parking space from the customer prior to the booking. Reserving parking space for the customers will lead to reduction in cancellation.
+6) The above 5 points should be focused especially more on the market segment "Online TA" which is responsible for most of the cancellations
+7) Special care of the first 5 points should be given to transient customers as they cancel more than other type of customers
+8) Customers who are families especially who have children and babies would hardly cancel bookings in your hotels, focus on customers in groups of 2.
+
+
+5. Geogrphic Analysis
+```{r}
+x<- hotels %>% #filtering hotel data set
+  group_by(Country) %>% #by countries
+  summarise(Frequency = sum(as.numeric(IsCanceled))) #and summing 
+
+```
+
+```{r}
+joinData <- joinCountryData2Map( x, #joining our country subset
+                                 joinCode = "ISO3", #with code
+                                 nameJoinColumn = "Country") #to countries
+```
+
+```{r}
+#WorldMap
+theMap <- mapCountryData( joinData, nameColumnToPlot="Frequency", mapTitle= 'World Map Cancellations Frequency', addLegend=TRUE,catMethod = "Pretty", colourPalette = "Terrain", oceanCol = 'light blue',missingCountryCol = 'transparent')
+#do.call( addMapLegend, c(theMap, legendWidth=1, legendMar = 2))
+```
+```{r}
+#EUROPE
+theMap <- mapCountryData( joinData, nameColumnToPlot="Frequency", mapTitle= 'Europe Cancellations Frequency',addLegend=TRUE,catMethod = "Pretty", colourPalette = "Terrain", oceanCol = 'light blue',missingCountryCol = 'transparent',mapRegion = "Europe" )
+#do.call( addMapLegend, c(theMap, legendWidth=1, legendMar = 2))
+
+#country_coord<-data.frame(coordinates(joinData),stringsAsFactors=F)
+# label the countries
+#text(x=country_coord$X1,y=country_coord$X2,labels=row.names(country_coord))
+```
+
+
+```{r}
+#Africa
+theMap <- mapCountryData( joinData, nameColumnToPlot="Frequency", mapTitle= 'Africa Cancellations Frequency',addLegend=TRUE,catMethod = "Pretty", colourPalette = "Terrain", oceanCol = 'light blue',missingCountryCol = 'transparent',mapRegion = "Africa" )
+#do.call( addMapLegend, c(theMap, legendWidth=1, legendMar = 2))
+
+#country_coord<-data.frame(coordinates(joinData),stringsAsFactors=F)
+# label the countries
+#text(x=country_coord$X1,y=country_coord$X2,labels=row.names(country_coord))
+```
+
+
+```{r}
+#ASIA
+
+theMap <- mapCountryData( joinData, nameColumnToPlot="Frequency", mapTitle= 'Asia Cancellations Frequency',addLegend=TRUE,catMethod = "Pretty", colourPalette = "Terrain", oceanCol = 'light blue',missingCountryCol = 'transparent',mapRegion = "Asia" )
+#do.call( addMapLegend, c(theMap, legendWidth=1, legendMar = 2))
+
+#country_coord<-data.frame(coordinates(joinData),stringsAsFactors=F)
+# label the countries
+#text(x=country_coord$X1,y=country_coord$X2,labels=row.names(country_coord))
+```
+
+
+```{r}
+#Europe-Asia
+
+theMap <- mapCountryData( joinData, nameColumnToPlot="Frequency", mapTitle= 'Eurasia Cancellations Frequency',addLegend=TRUE,catMethod = "Pretty", colourPalette = "Terrain", oceanCol = 'light blue',missingCountryCol = 'transparent',mapRegion = "eurasia" )
+#do.call( addMapLegend, c(theMap, legendWidth=1, legendMar = 2))
+
+#country_coord<-data.frame(coordinates(joinData),stringsAsFactors=F)
+# label the countries
+#text(x=country_coord$X1,y=country_coord$X2,labels=row.names(country_coord))
+```
+
+
+```{r}
+#Latin america
+
+theMap <- mapCountryData( joinData, nameColumnToPlot="Frequency", mapTitle= 'Latin America Cancellations Frequency',addLegend=TRUE,catMethod = "Pretty", colourPalette = "Terrain", oceanCol = 'light blue',missingCountryCol = 'transparent',mapRegion = "latin america" )
+#do.call( addMapLegend, c(theMap, legendWidth=1, legendMar = 2))
+
+#country_coord<-data.frame(coordinates(joinData),stringsAsFactors=F)
+# label the countries
+#text(x=country_coord$X1,y=country_coord$X2,labels=row.names(country_coord))
+```
+
+
+```{r}
+#North america
+
+theMap <- mapCountryData( joinData, nameColumnToPlot="Frequency", mapTitle= 'North America Cancellations Frequency',addLegend=TRUE,catMethod = "Pretty", colourPalette = "Terrain", oceanCol = 'light blue',missingCountryCol = 'transparent',mapRegion = "north america" )
+#do.call( addMapLegend, c(theMap, legendWidth=1, legendMar = 2))
+
+#country_coord<-data.frame(coordinates(joinData),stringsAsFactors=F)
+# label the countries
+#text(x=country_coord$X1,y=country_coord$X2,labels=row.names(country_coord))
+```
+
+
+
+```{r}
+#Oceania
+
+theMap <- mapCountryData( joinData, nameColumnToPlot="Frequency", mapTitle= 'Oceania Cancellations Frequency',addLegend=TRUE,catMethod = "Pretty", colourPalette = "Terrain", oceanCol = 'light blue',missingCountryCol = 'transparent',mapRegion = "oceania" )
+#do.call( addMapLegend, c(theMap, legendWidth=1, legendMar = 2))
+
+#country_coord<-data.frame(coordinates(joinData),stringsAsFactors=F)
+# label the countries
+#text(x=country_coord$X1,y=country_coord$X2,labels=row.names(country_coord))
+```
+
+
+
+```{r}
+#United Kingdom
+
+theMap <- mapCountryData( joinData, nameColumnToPlot="Frequency", mapTitle= 'United Kingdom Cancellations Frequency',addLegend=TRUE,catMethod = "Pretty", colourPalette = "Terrain", oceanCol = 'light blue',missingCountryCol = 'transparent',mapRegion = "uk" )
+#do.call( addMapLegend, c(theMap, legendWidth=1, legendMar = 2))
+
+#country_coord<-data.frame(coordinates(joinData),stringsAsFactors=F)
+# label the countries
+#text(x=country_coord$X1,y=country_coord$X2,labels=row.names(country_coord))
+```
+
+6. Miscellaneous Graphing
+```{r}
+ggplot(hotels, aes(factor(IsCanceled), #bar plot of only the IsCanceled variable
+        fill = factor(IsCanceled))) +geom_bar()+ xlab("0= Non-Cancelled booking, 1= Cancelled booking")+ ylab("Count")
+
+ggplot(hotels, aes(factor(IsRepeatedGuest), #bar plot describing the IsRepeatedGuest variable with IsCanceled fill
+        fill = factor(IsCanceled))) +geom_bar() + xlab("Repeated Guest(1) or not (0) \n 0= Non-Cancelled booking, 1= Cancelled booking")+ ylab("Count")
+
+ggplot(hotels, aes(factor(MarketSegment), #bar plot describing the MarketSegment variable with IsCanceled fill
+        fill = factor(IsCanceled))) +geom_bar()+ xlab("Market Segment\n 0= Not-Cancelled booking, 1= Cancelled booking")+ ylab("Count")
+
+ggplot(hotels, aes(factor(DepositType), #bar plot describing the DepositType variable with IsCanceled fill
+        fill = factor(IsCanceled))) +geom_bar()+ xlab("Deposit Type\n 0= Non-Cancelled booking, 1= Cancelled booking")+ ylab("Count")
+
+ggplot(hotels, aes(factor(CustomerType), #bar plot describing the CustomerType variable with IsCanceled fill
+        fill = factor(IsCanceled))) +geom_bar()+ xlab("Customer Type\n 0= Non-Cancelled booking, 1= Cancelled booking")+ ylab("Count")
+```
+
+
+```{r}
+hotels %>% #generalized bar plots with each of the variables
+  keep(is.numeric) %>% #changing factors to numeric where possible
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_bar()
+```
+
+7. Descriptive Statistics and Associated Plots
+```{r}
+numdata <- hotels[,c('IsCanceled','LeadTime','StaysInWeekendNights','StaysInWeekNights',
+                     'PreviousCancellations','PreviousBookingsNotCanceled','BookingChanges',
+                     'RequiredCarParkingSpaces')] #subsetting only the numerical columns
+numdata$IsCanceled <- factor(numdata$IsCanceled, levels = c(0,1), labels = c('Not Canceled', 'Canceled')) #changing IsCanceled to Factored Data
+newstay <- numdata[numdata$IsCanceled == 'Not Canceled',][,-1] #data set with all of the non-cancellations
+newcancel <- numdata[numdata$IsCanceled == 'Canceled',][,-1] #data set with all of the cancellations
+summary(newstay) #summary statistics of stay observations
+summary(newcancel) #summary statistics of cancel observations
+
+numdata$IsCanceled <- as.numeric(numdata$IsCanceled)-1 #bringing back to numeric only for the next function
+cor(numdata) #correlation matrix between all of the numeric variables and IsCanceled as numeric
+numdata$IsCanceled <- factor(numdata$IsCanceled, levels = c(0,1), labels = c('Not Canceled', 'Canceled')) #changing IsCanceled back to Factored Data
+```
+
+Descriptive Statistics to note:
+- Lead time appears much larger in cancellation data set
+
+- IsRepeatedGuest has a significantly higher mean in stays
+
+- PreviousCancellations has a significantly higher mean in canceled
+
+- PreviousBookingsNotCanceled has a significantly higher mean in stays
+
+- BookingChanges has a higher mean in stays
+
+```{r}
+boxplot(LeadTime ~ IsCanceled, data = numdata) #LeadTime
+boxplot(StaysInWeekendNights ~ IsCanceled, data = numdata) #StaysInWeekendNights
+boxplot(StaysInWeekNights ~ IsCanceled, data = numdata) #StaysInWeekNights
+boxplot(PreviousCancellations ~ IsCanceled, data = numdata) #PreviousCancellations
+boxplot(PreviousBookingsNotCanceled ~ IsCanceled, data = numdata) #PreviousBookingsNotCanceled
+boxplot(BookingChanges ~ IsCanceled, data = numdata) #BookingChanges
+boxplot(RequiredCarParkingSpaces ~ IsCanceled, data = numdata) #RequiredParkingSpaces
+```
+
+Modified box plots to Get a Better Idea of Variable Distribution (temporily remove outliers 3 standard deviations away from mean)
+```{r}
+boxplot(LeadTime ~ IsCanceled, data = numdata[numdata$LeadTime<mean(numdata$LeadTime)+3*sd(numdata$LeadTime),]) #LeadTime
+boxplot(StaysInWeekendNights ~ IsCanceled, data = numdata[numdata$StaysInWeekendNights < mean(numdata$StaysInWeekendNights)+
+                                                            3*sd(numdata$StaysInWeekendNights),]) #StaysInWeekendNights
+boxplot(StaysInWeekNights ~ IsCanceled, data = numdata[numdata$StaysInWeekNights < mean(numdata$StaysInWeekNights)+
+                                                         3*sd(numdata$StaysInWeekNights),]) #StaysInWeekNights
+boxplot(PreviousCancellations ~ IsCanceled, data = numdata[numdata$PreviousCancellations < mean(numdata$PreviousCancellations)+
+                                                             3*sd(numdata$PreviousCancellations),]) #PreviousCancellations
+boxplot(PreviousBookingsNotCanceled ~ IsCanceled, data = numdata[numdata$PreviousBookingsNotCanceled < mean(numdata$PreviousBookingsNotCanceled)+
+                                                                   3*sd(numdata$PreviousBookingsNotCanceled),]) #PreviousBookingsNotCanceled
+boxplot(BookingChanges ~ IsCanceled, data = numdata[numdata$BookingChanges < mean(numdata$BookingChanges)+
+                                                      3*sd(numdata$BookingChanges),]) #BookingChanges
+boxplot(RequiredCarParkingSpaces ~ IsCanceled, data = numdata[numdata$RequiredCarParkingSpaces <
+                                                                mean(numdata$RequiredCarParkingSpaces)+
+                                                                3*sd(numdata$RequiredCarParkingSpaces),]) #RequiredParkingSpaces
+```
+
+Looking at Boxplots of LeadTime in Correspondance with other factors
+
+```{r}
+stayfull <- hotels[hotels$IsCanceled == 0,][,-20][,-1] #data set with all of the non-cancellations
+cancelfull <- hotels[hotels$IsCanceled == 1,][,-20][,-1] #data set with all of the cancellations
+```
+
+```{r Adult_Boxplots}
+boxplot(LeadTime ~ Adults, data = stayfull) #stays
+boxplot(LeadTime ~ Adults, data = cancelfull) #cancels
+```
+
+8. Running some models
+```{r}
+linmod <- lm(as.numeric(IsCanceled) ~ ., data = numdata) #running a linear model. Won't be super accurate because IsCanceled is dichotomous; need log
+summary(linmod)
+
+logmod <- glm(IsCanceled ~ ., family = binomial(link="logit"), data = numdata[-13920,]) #major outlier at 13920; 27 previous bookings attended
+summary(logmod)
+
+logmod2 <- glm(IsCanceled ~ LeadTime, family = binomial(link="logit"), data = numdata) #just checking out Lead Time
+summary(logmod2)
+
+model_performance(logmod) #used to find psuedo r-squared of logistics
+anova(logmod, test = "Chisq") #analyzing chi-squared results
+
+#vif(linmod) #no colinarity!
+#vif(logmod) #none here either
+```
+
+Predictions:
+```{r}
+linout <- predict(linmod, numdata[,-1]) #prediction data with linear model
+linout <- data.frame(linout) #merging it into data frame
+linout$data <- 0 #creating new column of 0's
+#linout$data[linout$linout > as.numeric(median(linout$linout))] <- 1
+linout$data[linout$linout > 1.5] <- 1 #1.5 is the halfway point in the factored IsCanceled data; make the top half 1
+linout$data <- factor(linout$data, levels = c(0,1), labels = c('Not Canceled', 'Canceled')) #changing new column to Factored Data
+
+confusionMatrix(as.factor(linout$data),numdata$IsCanceled) #creating a confusion matrix to analyze results
+
+logout <- predict(logmod, numdata[,-1]) #prediction data with logistic model
+logout <- data.frame(logout) #merging it into data frame
+logout$data <- 0 #creating new column of 0's
+#logout$data[logout$logout > as.numeric(median(logout$logout))] <- 1
+logout$data[logout$logout > 1.5] <- 1 #1.5 is halfway point in the factored IsCanceled data; make the top half 1
+logout$data <- factor(logout$data, levels = c(0,1), labels = c('Not Canceled', 'Canceled')) #changing new column to Factored Data
+
+confusionMatrix(as.factor(logout$data),numdata$IsCanceled) #creating confusion matrix to analyze results
+```
+
+Analytical Plots
+```{r}
+plot(x = numdata$LeadTime, y = numdata$IsCanceled) #ploting canceled vs leadtime
+plot(linmod) #plotting linear model residuals
+```
+
+```{r}
+simulationOutput <- simulateResiduals(fittedModel = logmod, n = 250) #simulaiing the logarithmic residuals
+plot(simulationOutput) #ploting the simulation
+
+plot(logmod) #outlier at 13920; removed to better view graphic
+```
+
+Looking at Variable Interactions
+```{r}
+linintmod <- lm(as.numeric(IsCanceled) ~ .+StaysInWeekendNights:StaysInWeekNights+PreviousCancellations:PreviousBookingsNotCanceled, data = numdata) #running a linear model. Won't be super accurate because IsCanceled is dichotomous; need log
+summary(linintmod)
+
+logintmod <- glm(IsCanceled ~  .+StaysInWeekendNights:StaysInWeekNights, family = binomial(link="logit"), data = numdata[-13920,]) #major outlier at 13920; 27 previous bookings attended
+summary(logintmod)
+
+linintout <- predict(linintmod, numdata[,-1]) #interaction predictions; same method as before
+linintout <- data.frame(linintout)
+linintout$data <- 0
+#linout$data[linout$linout > as.numeric(median(linout$linout))] <- 1
+linintout$data[linintout$linintout > 1.5] <- 1 #1.5 is the halfway point in the factored IsCanceled data
+linintout$data <- factor(linintout$data, levels = c(0,1), labels = c('Not Canceled', 'Canceled')) #changing new column to Factored Data
+
+confusionMatrix(as.factor(linintout$data),numdata$IsCanceled)
+
+logintout <- predict(logintmod, numdata[,-1]) #interaction predictions; same method as before
+logintout <- data.frame(logintout)
+logintout$data <- 0
+#logout$data[logout$logout > as.numeric(median(logout$logout))] <- 1
+logintout$data[logintout$logintout > 1.5] <- 1
+logintout$data <- factor(logintout$data, levels = c(0,1), labels = c('Not Canceled', 'Canceled')) #changing new column to Factored Data
+
+confusionMatrix(as.factor(logintout$data),numdata$IsCanceled)
+```
+
+9. Moving on to Factors
+```{r}
+#changing hotel categorical variables into factored variables
+hotels$IsCanceled <- as.factor(hotels$IsCanceled)
+hotels$Adults <- as.factor(hotels$Adults)
+hotels$Children <- as.factor(hotels$Children)
+hotels$Babies <- as.factor(hotels$Babies)
+hotels$Meal <- as.factor(hotels$Meal)
+hotels$Country <- as.factor(hotels$Country)
+hotels$MarketSegment <- as.factor(hotels$MarketSegment)
+hotels$IsRepeatedGuest <- as.factor(hotels$IsRepeatedGuest)
+hotels$ReservedRoomType <- as.factor(hotels$ReservedRoomType)
+hotels$AssignedRoomType <- as.factor(hotels$AssignedRoomType)
+hotels$DepositType <- as.factor(hotels$DepositType)
+hotels$CustomerType <- as.factor(hotels$CustomerType)
+
+facdata <- data.frame(hotels[,-20][,-19][,-16][,-13][,-12][,-4][,-3][,-2], #subsetting the numerics and the columns changing into factors
+                         PreviousCancellations = factor(hotels$PreviousCancellations > 0, levels = c(FALSE, TRUE), labels = c('None','Some')), #factoring PreviousCancellations
+                         PreviousBookingsNotCanceled = factor(hotels$PreviousBookingsNotCanceled > 0, levels = c(FALSE, TRUE), labels = c('No Attended Resrvation','Have Followed Booking')), #factoring PreviousBookingsNotCanceled
+                         BookingChanges = factor(hotels$BookingChanges > 0, levels = c(FALSE, TRUE), labels = c('No Booking Changes', 'Some Booking Changes')), #factoring BookingChanges
+                         RequiredParkingSpaces = factor(hotels$RequiredCarParkingSpaces > 0, levels = c(FALSE, TRUE), labels = c('No Required Parking Spaces', 'Required Parking Space')), #factoring RequiredCarParkingSpaces
+                         TotalOfSpecialRequests = factor(hotels$TotalOfSpecialRequests > 0, levels = c(FALSE, TRUE), labels = c('No Special Requests', 'Made Special Requests'))) #factoring number of special requests
+```
+
+10. SVM
+```{r}
+#svm part 1
+set.seed(100) #setting random number generator
+trainList <- createDataPartition(y=facdata$IsCanceled,p=.60,list=FALSE) #partitioning the data
+summary(trainList) 
+str(trainList)
+#trainList
+trainSet<- facdata[trainList, ] #making training data set with partitioned indices
+testSet<- facdata[-trainList, ] #making testing data set with remaining observations
+testSet<- data.frame(testSet) #converting test set into data frame
+#str(trainSet)
+#str(testSet)
+
+#svm part2
+svmModel<- ksvm(IsCanceled~., data=trainSet, C = 5, cross=3, prob.model=TRUE) #running svm model
+svmModel
+
+predOut<- predict(svmModel, testSet) #getting predictions from svm model using test data set
+
+confusionMatrix(predOut,testSet$IsCanceled) #analyzing results in a confusion matrix
+```
+
+11. Association Rule Mining
+```{r}
+hotels$IsCanceled <- as.factor(hotels$IsCanceled) #repositioning IsCanceled to remain consistent with future code
+hotelsX <- as(hotels, Class = 'transactions') #making a hotels data set with transactions
+itemFrequencyPlot(hotelsX, topN = 10) #making an item frequency plot; not necessarily needed
+```
+
+
+```{r}
+freq <- itemFrequency(hotelsX) #creating item frequency
+str(freq)
+items <- sort(freq) #sorting data in ascending :sort(-item)#Descending
+
+head(items) # least bought items
+tail(items)
+```
+
+```{r}
+hotel_rule <- apriori(hotelsX, #apriori transactions
+parameter=list(supp=0.008, conf=0.9), #0.8 \% of instances with 90% confidence
+control=list(verbose=F),
+appearance=list(default="lhs",rhs=("IsCanceled=1"))) #looking for canceled reservations
+```
+
+```{r}
+inspectDT(hotel_rule) #inspecting rule
+```
